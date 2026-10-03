@@ -1,0 +1,2964 @@
+openapi: 3.1.0
+info:
+  title: Lattice Backend API
+  version: 1.0.0
+  description: |
+    JSON envelopes are {data,requestId} and {error:{code,message,details?},requestId}.
+    All tenant routes check membership. Mutating configuration requires owner role.
+    All response shapes are also defined in ../src/contracts/api.ts.
+    Lists use {items,nextCursor}; query limit 1..100 and cursor UUID. No implicit auto-purchases.
+    Uploads and imports are staged. Releases are immutable snapshots. Deletions override every release.
+servers:
+  - url: http://localhost:4000/api/v1
+security:
+  - supabase: []
+components:
+  securitySchemes:
+    supabase:
+      type: http
+      scheme: bearer
+      description: Supabase access token
+    widget:
+      type: http
+      scheme: bearer
+      description: Opaque token returned by POST /public/sessions
+  parameters:
+    workspaceId:
+      name: workspaceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    sourceId:
+      name: sourceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    conversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    releaseId:
+      name: releaseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    jobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    idempotency:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+        - requestId
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details: {}
+        requestId:
+          type: string
+    Envelope:
+      type: object
+      required:
+        - data
+        - requestId
+      properties:
+        data: {}
+        requestId:
+          type: string
+    Accepted:
+      type: object
+      properties:
+        jobId:
+          $ref: '#/components/schemas/UUID'
+      required:
+        - jobId
+    CreateWorkspace:
+      type: object
+      properties:
+        name:
+          type: string
+        agentName:
+          type: string
+        supportEmail:
+          type: string
+        websiteUrl:
+          type: string
+      required:
+        - name
+        - agentName
+        - supportEmail
+    SourceInput:
+      type: object
+      required:
+        - title
+        - kind
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        kind:
+          enum:
+            - website
+            - sitemap
+            - pdf
+            - text
+            - markdown
+            - qa_csv
+            - qa_xlsx
+            - approved_answer
+        url:
+          type: string
+          format: uri
+        content:
+          type: string
+          maxLength: 1000000
+        authority:
+          enum:
+            - approved
+            - authoritative
+            - reference
+        approvalRequired:
+          type: boolean
+        dependsOnSourceIds:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+    SourceUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        authority:
+          enum:
+            - approved
+            - authoritative
+            - reference
+        approvalRequired:
+          type: boolean
+        action:
+          enum:
+            - archive
+            - restore
+        content:
+          type: string
+          maxLength: 1000000
+        dependsOnSourceIds:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+    Question:
+      type: object
+      required:
+        - question
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        conversationId:
+          type: string
+          format: uuid
+        releaseId:
+          type: string
+          format: uuid
+    Feedback:
+      type: object
+      required:
+        - messageId
+        - rating
+      properties:
+        messageId:
+          type: string
+          format: uuid
+        rating:
+          enum:
+            - helpful
+            - unhelpful
+        comment:
+          type: string
+          maxLength: 2000
+    Handoff:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          maxLength: 120
+        message:
+          type: string
+          maxLength: 4000
+    EvalCaseInput:
+      type: object
+      properties:
+        caseId:
+          type: string
+        question:
+          type: string
+        conversationContext:
+          type: string
+        previousAnswer:
+          type: string
+        expectedFacts:
+          type: array
+          items:
+            type: string
+        sourceIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+        category:
+          type: string
+        importance:
+          type: string
+          enum:
+            - normal
+            - critical
+        split:
+          type: string
+          enum:
+            - development
+            - holdout
+        baselineTimestamp:
+          $ref: '#/components/schemas/ISODate'
+        control:
+          type: boolean
+      required:
+        - question
+        - expectedFacts
+        - importance
+        - split
+    Publish:
+      type: object
+      required:
+        - expectedPublishedReleaseId
+        - acknowledgeWarnings
+      properties:
+        expectedPublishedReleaseId:
+          type:
+            - string
+            - 'null'
+          format: uuid
+        acknowledgeWarnings:
+          type: boolean
+    Config:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 2000
+        tone:
+          type: string
+          maxLength: 200
+        instructions:
+          type: string
+          maxLength: 4000
+        supportEmail:
+          type: string
+          format: email
+        handoffMessage:
+          type: string
+          maxLength: 1000
+        accentColor:
+          type: string
+          pattern: ^#[0-9a-fA-F]{6}$
+        starterQuestions:
+          type: array
+          maxItems: 6
+          items:
+            type: string
+            maxLength: 200
+        allowedOrigins:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            format: uri
+        autoPublish:
+          type: boolean
+    UUID:
+      type: string
+      description: Lattice API v1. Dependency-free; safe to import into browser bundles.
+    ISODate:
+      type: string
+    Json:
+      anyOf:
+        - type: 'null'
+        - type: boolean
+        - type: number
+        - type: string
+        - type: array
+          items:
+            $ref: '#/components/schemas/Json'
+        - type: object
+          additionalProperties:
+            $ref: '#/components/schemas/Json'
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              $ref: '#/components/schemas/Json'
+          required:
+            - code
+            - message
+        requestId:
+          type: string
+      required:
+        - error
+        - requestId
+    Role:
+      type: string
+      enum:
+        - owner
+        - member
+    Authority:
+      type: string
+      enum:
+        - approved
+        - authoritative
+        - reference
+    SourceKind:
+      type: string
+      enum:
+        - website
+        - sitemap
+        - pdf
+        - text
+        - markdown
+        - qa_csv
+        - qa_xlsx
+        - approved_answer
+    JobState:
+      type: string
+      enum:
+        - queued
+        - running
+        - succeeded
+        - failed
+    AgentConfig:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        tone:
+          type: string
+        instructions:
+          type: string
+        supportEmail:
+          type: string
+        handoffMessage:
+          type: string
+        accentColor:
+          type: string
+        starterQuestions:
+          type: array
+          items:
+            type: string
+        allowedOrigins:
+          type: array
+          items:
+            type: string
+        autoPublish:
+          type: boolean
+        ragPolicy:
+          $ref: '#/components/schemas/RagPolicy'
+      required:
+        - name
+        - description
+        - tone
+        - instructions
+        - supportEmail
+        - handoffMessage
+        - accentColor
+        - starterQuestions
+        - allowedOrigins
+        - autoPublish
+    Workspace:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+      required:
+        - id
+        - name
+        - role
+        - createdAt
+    Agent:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        workspaceId:
+          $ref: '#/components/schemas/UUID'
+        draftConfig:
+          $ref: '#/components/schemas/AgentConfig'
+        publishedReleaseId:
+          anyOf:
+            - $ref: '#/components/schemas/UUID'
+            - type: 'null'
+        draftRevision:
+          type: number
+      required:
+        - id
+        - workspaceId
+        - draftConfig
+        - publishedReleaseId
+        - draftRevision
+    Bootstrap:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              $ref: '#/components/schemas/UUID'
+            email:
+              type: string
+          required:
+            - id
+            - email
+        workspaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workspace'
+      required:
+        - user
+        - workspaces
+    WorkspaceDetail:
+      type: object
+      properties:
+        workspace:
+          $ref: '#/components/schemas/Workspace'
+        agent:
+          $ref: '#/components/schemas/Agent'
+      required:
+        - workspace
+        - agent
+    Member:
+      type: object
+      properties:
+        userId:
+          $ref: '#/components/schemas/UUID'
+        email:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+      required:
+        - userId
+        - email
+        - role
+    InviteMember:
+      type: object
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+          const: member
+      required:
+        - email
+        - role
+      description: Invitation is accepted on bootstrap by the verified Supabase email.
+    Source:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        workspaceId:
+          $ref: '#/components/schemas/UUID'
+        title:
+          type: string
+        kind:
+          $ref: '#/components/schemas/SourceKind'
+        url:
+          type:
+            - string
+            - 'null'
+        authority:
+          $ref: '#/components/schemas/Authority'
+        approvalRequired:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - active
+            - archived
+            - deleted
+        held:
+          type: boolean
+        draftVersionId:
+          anyOf:
+            - $ref: '#/components/schemas/UUID'
+            - type: 'null'
+        publishedVersionId:
+          anyOf:
+            - $ref: '#/components/schemas/UUID'
+            - type: 'null'
+        processingState:
+          type: string
+          enum:
+            - queued
+            - processing
+            - ready
+            - partial
+            - failed
+        warnings:
+          type: array
+          items:
+            type: string
+        lastCheckedAt:
+          anyOf:
+            - $ref: '#/components/schemas/ISODate'
+            - type: 'null'
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+        revision:
+          type: number
+        crawlPolicy:
+          $ref: '#/components/schemas/CrawlPolicy'
+      required:
+        - id
+        - workspaceId
+        - title
+        - kind
+        - url
+        - authority
+        - approvalRequired
+        - status
+        - held
+        - draftVersionId
+        - publishedVersionId
+        - processingState
+        - warnings
+        - lastCheckedAt
+        - createdAt
+        - revision
+    CreateSource:
+      type: object
+      properties:
+        title:
+          type: string
+        kind:
+          $ref: '#/components/schemas/SourceKind'
+        url:
+          type: string
+        content:
+          type: string
+        authority:
+          $ref: '#/components/schemas/Authority'
+        approvalRequired:
+          type: boolean
+        dependsOnSourceIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+        crawlPolicy:
+          $ref: '#/components/schemas/CrawlPolicy'
+      required:
+        - title
+        - kind
+      description: Files use multipart/form-data at /sources/upload (file, title, kind, authority, approvalRequired).
+    UpdateSource:
+      type: object
+      properties:
+        expectedRevision:
+          type: number
+        title:
+          type: string
+        authority:
+          $ref: '#/components/schemas/Authority'
+        approvalRequired:
+          type: boolean
+        action:
+          type: string
+          enum:
+            - archive
+            - restore
+        content:
+          type: string
+        dependsOnSourceIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+        crawlPolicy:
+          $ref: '#/components/schemas/CrawlPolicy'
+      required:
+        - expectedRevision
+    SourceVersion:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        sourceId:
+          $ref: '#/components/schemas/UUID'
+        contentHash:
+          type: string
+        content:
+          type: string
+        pageCount:
+          type: number
+        warnings:
+          type: array
+          items:
+            type: string
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+        references:
+          type: array
+          items:
+            type: object
+            properties:
+              page:
+                type: number
+              section:
+                type: string
+              url:
+                type: string
+      required:
+        - id
+        - sourceId
+        - contentHash
+        - content
+        - pageCount
+        - warnings
+        - createdAt
+        - references
+    SourceDetail:
+      type: object
+      properties:
+        source:
+          $ref: '#/components/schemas/Source'
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceVersion'
+      required:
+        - source
+        - versions
+    SourceAccepted:
+      type: object
+      properties:
+        jobId:
+          $ref: '#/components/schemas/UUID'
+        sourceId:
+          $ref: '#/components/schemas/UUID'
+      required:
+        - jobId
+        - sourceId
+    Evidence:
+      type: object
+      properties:
+        sourceId:
+          $ref: '#/components/schemas/UUID'
+        sourceVersionId:
+          $ref: '#/components/schemas/UUID'
+        chunkId:
+          $ref: '#/components/schemas/UUID'
+        title:
+          type: string
+        authority:
+          $ref: '#/components/schemas/Authority'
+        excerpt:
+          type: string
+        page:
+          type: number
+        section:
+          type: string
+        url:
+          type: string
+        eligible:
+          type: boolean
+      required:
+        - sourceId
+        - sourceVersionId
+        - chunkId
+        - title
+        - authority
+        - excerpt
+        - eligible
+    Disposition:
+      type: string
+      enum:
+        - answer
+        - clarification
+        - handoff
+    Answer:
+      type: object
+      properties:
+        conversationId:
+          $ref: '#/components/schemas/UUID'
+        messageId:
+          $ref: '#/components/schemas/UUID'
+        releaseId:
+          $ref: '#/components/schemas/UUID'
+        content:
+          type: string
+        disposition:
+          $ref: '#/components/schemas/Disposition'
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/Evidence'
+        model:
+          type:
+            - string
+            - 'null'
+        promptVersion:
+          type: string
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+      required:
+        - conversationId
+        - messageId
+        - releaseId
+        - content
+        - disposition
+        - evidence
+        - model
+        - promptVersion
+        - createdAt
+    PreviewRequest:
+      type: object
+      properties:
+        question:
+          type: string
+        conversationId:
+          $ref: '#/components/schemas/UUID'
+        releaseId:
+          $ref: '#/components/schemas/UUID'
+      required:
+        - question
+    Conversation:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        mode:
+          type: string
+          enum:
+            - preview
+            - visitor
+            - evaluation
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+        updatedAt:
+          $ref: '#/components/schemas/ISODate'
+        unhelpfulCount:
+          type: number
+      required:
+        - id
+        - mode
+        - createdAt
+        - updatedAt
+    Message:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        role:
+          type: string
+          enum:
+            - user
+            - assistant
+        content:
+          type: string
+        releaseId:
+          anyOf:
+            - $ref: '#/components/schemas/UUID'
+            - type: 'null'
+        disposition:
+          anyOf:
+            - $ref: '#/components/schemas/Disposition'
+            - type: 'null'
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/Evidence'
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+      required:
+        - id
+        - role
+        - content
+        - releaseId
+        - disposition
+        - evidence
+        - createdAt
+    ConversationDetail:
+      type: object
+      properties:
+        conversation:
+          $ref: '#/components/schemas/Conversation'
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        escalations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Escalation'
+        feedback:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoredFeedback'
+      required:
+        - conversation
+        - messages
+        - escalations
+    Escalation:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        conversationId:
+          $ref: '#/components/schemas/UUID'
+        status:
+          type: string
+          enum:
+            - pending
+            - sent
+            - failed
+        email:
+          type: string
+        attempts:
+          type: number
+        lastError:
+          type:
+            - string
+            - 'null'
+        sentAt:
+          anyOf:
+            - $ref: '#/components/schemas/ISODate'
+            - type: 'null'
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+      required:
+        - id
+        - conversationId
+        - status
+        - email
+        - attempts
+        - lastError
+        - sentAt
+        - createdAt
+    FeedbackRequest:
+      type: object
+      properties:
+        messageId:
+          $ref: '#/components/schemas/UUID'
+        rating:
+          type: string
+          enum:
+            - helpful
+            - unhelpful
+        comment:
+          type: string
+      required:
+        - messageId
+        - rating
+    HandoffRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        message:
+          type: string
+      required:
+        - email
+    HandoffAccepted:
+      type: object
+      properties:
+        jobId:
+          $ref: '#/components/schemas/UUID'
+        escalationId:
+          $ref: '#/components/schemas/UUID'
+        status:
+          type: string
+          const: pending
+      required:
+        - escalationId
+        - jobId
+        - status
+    EvalCase:
+      type: object
+      properties:
+        caseId:
+          type: string
+        question:
+          type: string
+        conversationContext:
+          type: string
+        previousAnswer:
+          type: string
+        expectedFacts:
+          type: array
+          items:
+            type: string
+        sourceIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+        category:
+          type: string
+        importance:
+          type: string
+          enum:
+            - normal
+            - critical
+        split:
+          type: string
+          enum:
+            - development
+            - holdout
+        baselineTimestamp:
+          $ref: '#/components/schemas/ISODate'
+        control:
+          type: boolean
+        id:
+          $ref: '#/components/schemas/UUID'
+        revision:
+          type: number
+        frozen:
+          type: boolean
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+      required:
+        - createdAt
+        - expectedFacts
+        - frozen
+        - id
+        - importance
+        - question
+        - revision
+        - split
+    EvalImport:
+      type: object
+      properties:
+        cases:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvalCaseInput'
+        csv:
+          type: string
+    EvalRunRequest:
+      type: object
+      properties:
+        releaseId:
+          $ref: '#/components/schemas/UUID'
+        caseIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+      required:
+        - releaseId
+    EvalRun:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        releaseId:
+          $ref: '#/components/schemas/UUID'
+        state:
+          $ref: '#/components/schemas/JobState'
+        jobId:
+          $ref: '#/components/schemas/UUID'
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+        limitations:
+          type: array
+          items:
+            type: string
+      required:
+        - id
+        - releaseId
+        - state
+        - jobId
+        - createdAt
+        - limitations
+    HumanVerdict:
+      type: string
+      enum:
+        - candidate_better
+        - baseline_better
+        - tie
+        - ungradable
+    EvalResult:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        caseId:
+          $ref: '#/components/schemas/UUID'
+        caseSnapshot:
+          $ref: '#/components/schemas/EvalCaseInput'
+        answer:
+          anyOf:
+            - $ref: '#/components/schemas/Answer'
+            - type: 'null'
+        deterministic:
+          type: object
+          properties:
+            missingFacts:
+              type: array
+              items:
+                type: string
+            eligibleCitations:
+              type: boolean
+          required:
+            - missingFacts
+            - eligibleCitations
+        preliminaryGrade:
+          anyOf:
+            - $ref: '#/components/schemas/Json'
+            - type: 'null'
+        humanVerdict:
+          anyOf:
+            - $ref: '#/components/schemas/HumanVerdict'
+            - type: 'null'
+        reviewedBy:
+          anyOf:
+            - $ref: '#/components/schemas/UUID'
+            - type: 'null'
+        error:
+          type:
+            - string
+            - 'null'
+      required:
+        - id
+        - caseId
+        - caseSnapshot
+        - answer
+        - deterministic
+        - preliminaryGrade
+        - humanVerdict
+        - reviewedBy
+        - error
+    EvalRunDetail:
+      type: object
+      properties:
+        run:
+          $ref: '#/components/schemas/EvalRun'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EvalResult'
+      required:
+        - run
+        - results
+    Release:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        label:
+          type: string
+        config:
+          $ref: '#/components/schemas/AgentConfig'
+        sourceVersionIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/UUID'
+        draftRevision:
+          type: number
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+        publishedAt:
+          anyOf:
+            - $ref: '#/components/schemas/ISODate'
+            - type: 'null'
+      required:
+        - id
+        - label
+        - config
+        - sourceVersionIds
+        - draftRevision
+        - createdAt
+        - publishedAt
+    ReleaseChecks:
+      type: object
+      properties:
+        releaseId:
+          $ref: '#/components/schemas/UUID'
+        latestRunId:
+          anyOf:
+            - $ref: '#/components/schemas/UUID'
+            - type: 'null'
+        failures:
+          type: number
+        regressions:
+          type: number
+        unreviewed:
+          type: number
+        criticalUnreviewed:
+          type: number
+        warnings:
+          type: array
+          items:
+            type: string
+      required:
+        - releaseId
+        - latestRunId
+        - failures
+        - regressions
+        - unreviewed
+        - criticalUnreviewed
+        - warnings
+    PublishRequest:
+      type: object
+      properties:
+        expectedPublishedReleaseId:
+          anyOf:
+            - $ref: '#/components/schemas/UUID'
+            - type: 'null'
+        acknowledgeWarnings:
+          type: boolean
+      required:
+        - expectedPublishedReleaseId
+        - acknowledgeWarnings
+      description: Owner must explicitly acknowledge visible failing/unreviewed checks to override.
+    Settings:
+      type: object
+      properties:
+        revision:
+          type: number
+        agent:
+          $ref: '#/components/schemas/Agent'
+        retentionDays:
+          type: number
+        monthlySpendLimitMicros:
+          type: number
+        automaticOverages:
+          type: boolean
+          const: false
+        billingEnabled:
+          type: boolean
+      required:
+        - revision
+        - agent
+        - retentionDays
+        - monthlySpendLimitMicros
+        - automaticOverages
+    UpdateSettings:
+      type: object
+      properties:
+        expectedRevision:
+          type: number
+        config:
+          type: object
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            tone:
+              type: string
+            instructions:
+              type: string
+            supportEmail:
+              type: string
+            handoffMessage:
+              type: string
+            accentColor:
+              type: string
+            starterQuestions:
+              type: array
+              items:
+                type: string
+            allowedOrigins:
+              type: array
+              items:
+                type: string
+            autoPublish:
+              type: boolean
+            ragPolicy:
+              $ref: '#/components/schemas/RagPolicy'
+        retentionDays:
+          type: number
+        monthlySpendLimitMicros:
+          type: number
+      required:
+        - expectedRevision
+    UsageKind:
+      type: string
+      enum:
+        - reply
+        - check
+        - embedding
+        - ocr
+        - preview
+    Usage:
+      type: object
+      properties:
+        periodStart:
+          $ref: '#/components/schemas/ISODate'
+        periodEnd:
+          $ref: '#/components/schemas/ISODate'
+        plan:
+          type: string
+          enum:
+            - trial
+            - starter
+            - growth
+        status:
+          type: string
+        limits:
+          type: object
+          properties:
+            replies:
+              type: number
+            checks:
+              type: number
+            sourcePages:
+              type: number
+            ocrPages:
+              type: number
+            members:
+              type: number
+          required:
+            - replies
+            - checks
+            - sourcePages
+            - ocrPages
+            - members
+        used:
+          type: object
+          properties:
+            reply:
+              type: number
+            check:
+              type: number
+            embedding:
+              type: number
+            ocr:
+              type: number
+            preview:
+              type: number
+          required:
+            - reply
+            - check
+            - embedding
+            - ocr
+            - preview
+        reserved:
+          type: object
+          properties:
+            reply:
+              type: number
+            check:
+              type: number
+            embedding:
+              type: number
+            ocr:
+              type: number
+            preview:
+              type: number
+          required:
+            - reply
+            - check
+            - embedding
+            - ocr
+            - preview
+        spentMicros:
+          type: number
+        reservedMicros:
+          type: number
+        monthlySpendLimitMicros:
+          type: number
+        automaticOverages:
+          type: boolean
+          const: false
+        indexedPages:
+          type: number
+        storageBytes:
+          type: number
+        billingEnabled:
+          type: boolean
+      required:
+        - periodStart
+        - periodEnd
+        - plan
+        - status
+        - limits
+        - used
+        - reserved
+        - spentMicros
+        - reservedMicros
+        - monthlySpendLimitMicros
+        - automaticOverages
+    BillingLink:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url
+    CheckoutRequest:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum:
+            - starter
+            - growth
+      required:
+        - plan
+    WidgetSessionRequest:
+      type: object
+      properties:
+        agentId:
+          $ref: '#/components/schemas/UUID'
+        parentOrigin:
+          type: string
+        loaderVersion:
+          type: string
+      required:
+        - agentId
+      description: Hosted iframes send the validated postMessage parent origin; direct embeds use their browser Origin.
+    WidgetSession:
+      type: object
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/UUID'
+        token:
+          type: string
+        expiresAt:
+          $ref: '#/components/schemas/ISODate'
+        conversationId:
+          $ref: '#/components/schemas/UUID'
+        config:
+          type: object
+          properties:
+            name:
+              type: string
+            accentColor:
+              type: string
+            starterQuestions:
+              type: array
+              items:
+                type: string
+            handoffMessage:
+              type: string
+            supportEmail:
+              type: string
+          required:
+            - name
+            - accentColor
+            - starterQuestions
+            - handoffMessage
+            - supportEmail
+      required:
+        - sessionId
+        - token
+        - expiresAt
+        - conversationId
+        - config
+      description: Store the opaque token only in widget-owned storage; it is not a dashboard token.
+    WidgetMessageRequest:
+      type: object
+      properties:
+        question:
+          type: string
+      required:
+        - question
+    Notification:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        kind:
+          type: string
+        summary:
+          type: string
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+        readAt:
+          anyOf:
+            - $ref: '#/components/schemas/ISODate'
+            - type: 'null'
+      required:
+        - id
+        - kind
+        - summary
+        - createdAt
+        - readAt
+    ApiJob:
+      $ref: '#/components/schemas/Job_Json_'
+    Job_Json_:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        kind:
+          type: string
+        state:
+          $ref: '#/components/schemas/JobState'
+        attempts:
+          type: number
+        result:
+          anyOf:
+            - $ref: '#/components/schemas/Json'
+            - type: 'null'
+        error:
+          anyOf:
+            - type: object
+              properties:
+                code:
+                  type: string
+                message:
+                  type: string
+              required:
+                - code
+                - message
+            - type: 'null'
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+        finishedAt:
+          anyOf:
+            - $ref: '#/components/schemas/ISODate'
+            - type: 'null'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelineStep'
+      required:
+        - id
+        - kind
+        - state
+        - attempts
+        - result
+        - error
+        - createdAt
+        - finishedAt
+    StoredFeedback:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/UUID'
+        messageId:
+          $ref: '#/components/schemas/UUID'
+        rating:
+          type: string
+          enum:
+            - helpful
+            - unhelpful
+        comment:
+          type:
+            - string
+            - 'null'
+        createdAt:
+          $ref: '#/components/schemas/ISODate'
+      required:
+        - id
+        - messageId
+        - rating
+        - comment
+        - createdAt
+    PipelineStep:
+      type: object
+      properties:
+        stage:
+          type: string
+        state:
+          type: string
+          enum:
+            - running
+            - succeeded
+            - failed
+        details:
+          $ref: '#/components/schemas/Json'
+        startedAt:
+          $ref: '#/components/schemas/ISODate'
+        finishedAt:
+          anyOf:
+            - $ref: '#/components/schemas/ISODate'
+            - type: 'null'
+      required:
+        - stage
+        - state
+        - details
+        - startedAt
+        - finishedAt
+    RagPolicy:
+      type: object
+      properties:
+        topK:
+          type: number
+        minSimilarity:
+          type: number
+        chunkSizeChars:
+          type: number
+        chunkOverlapChars:
+          type: number
+        maxHistoryChars:
+          type: number
+      required:
+        - topK
+        - minSimilarity
+        - chunkSizeChars
+        - chunkOverlapChars
+        - maxHistoryChars
+    CrawlPolicy:
+      type: object
+      properties:
+        maxPages:
+          type: number
+        excludePaths:
+          type: array
+          items:
+            type: string
+        selectedUrls:
+          type: array
+          items:
+            type: string
+      required:
+        - maxPages
+        - excludePaths
+        - selectedUrls
+    Installation:
+      type: object
+      properties:
+        agentId:
+          $ref: '#/components/schemas/UUID'
+        siteOrigin:
+          type: string
+        lastObservedAt:
+          $ref: '#/components/schemas/ISODate'
+        loaderVersion:
+          type: string
+        releaseId:
+          $ref: '#/components/schemas/UUID'
+        sessionCount:
+          type: number
+      required:
+        - agentId
+        - siteOrigin
+        - lastObservedAt
+        - loaderVersion
+        - releaseId
+        - sessionCount
+  responses:
+    OK:
+      description: Successful response. See operation description and shared TypeScript response type.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Envelope'
+    Accepted:
+      description: Durable operation accepted; poll jobId for completion.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - data
+              - requestId
+            properties:
+              data:
+                $ref: '#/components/schemas/Accepted'
+              requestId:
+                type: string
+    Error:
+      description:
+        Error envelope; 400 validation, 401 authentication, 403 permission, 404 missing, 409 conflict, 413 size,
+        429 quota/rate, 503 configuration/provider.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+paths:
+  /bootstrap:
+    get:
+      operationId: bootstrap
+      description: 'Bootstrap: verified user and workspaces; accepts matching pending invitations.'
+      responses:
+        '200':
+          description: Bootstrap
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Bootstrap'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces:
+    post:
+      operationId: createWorkspace
+      description: Create workspace, owner membership, one agent and bounded trial. Returns WorkspaceDetail.
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkspace'
+      responses:
+        '201':
+          description: WorkspaceDetail
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WorkspaceDetail'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: getWorkspace
+      description: WorkspaceDetail
+      responses:
+        '200':
+          description: WorkspaceDetail
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WorkspaceDetail'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/sources:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: listSources
+      description: Page<Source>
+      responses:
+        '200':
+          description: Source[]
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - items
+                      - nextCursor
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Source'
+                      nextCursor:
+                        type:
+                          - string
+                          - 'null'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+    post:
+      operationId: createSource
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceInput'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/sources/upload:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    post:
+      operationId: uploadSource
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - title
+                - kind
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                kind:
+                  enum:
+                    - pdf
+                    - text
+                    - markdown
+                    - qa_csv
+                    - qa_xlsx
+                authority:
+                  enum:
+                    - approved
+                    - authoritative
+                    - reference
+                approvalRequired:
+                  type: boolean
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/sources/{sourceId}:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/sourceId'
+    get:
+      operationId: getSource
+      description: SourceDetail
+      responses:
+        '200':
+          description: SourceDetail
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/SourceDetail'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateSource
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceUpdate'
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteSource
+      description: Permanent revocation across releases and rollback. Returns {deleted:true}.
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/sources/{sourceId}/reprocess:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/sourceId'
+    post:
+      operationId: reprocessSource
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/sources/{sourceId}/asset:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/sourceId'
+    get:
+      operationId: downloadAsset
+      description: Private original; eligibility rechecked. Binary exception to success envelope.
+      responses:
+        '200':
+          description: Attachment
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/preview:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    post:
+      operationId: preview
+      description: Draft snapshot by default; job result is Answer.
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Question'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/conversations:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: listConversations
+      description: Page<Conversation>; q searches transcript text.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 200
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+      responses:
+        '200':
+          description: Conversation[]
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - items
+                      - nextCursor
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Conversation'
+                      nextCursor:
+                        type:
+                          - string
+                          - 'null'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/conversations/{conversationId}:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/conversationId'
+    get:
+      operationId: getConversation
+      description: ConversationDetail; also usable as JSON transcript export.
+      responses:
+        '200':
+          description: ConversationDetail
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ConversationDetail'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteConversation
+      description: Erase transcript and revoke session. Returns {deleted:true}.
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/conversations/{conversationId}/feedback:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/conversationId'
+    post:
+      operationId: feedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Feedback'
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/conversations/{conversationId}/handoff:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/conversationId'
+    post:
+      operationId: handoff
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Handoff'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/escalations/{escalationId}/retry:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - name: escalationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: retryEscalation
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/evaluation/cases:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: listEvalCases
+      description: Page<EvalCase>
+      responses:
+        '200':
+          description: EvalCase[]
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - items
+                      - nextCursor
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EvalCase'
+                      nextCursor:
+                        type:
+                          - string
+                          - 'null'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+    post:
+      operationId: createEvalCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvalCaseInput'
+      responses:
+        '201':
+          description: EvalCase
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EvalCase'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/evaluation/cases/{caseId}:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - name: caseId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      operationId: updateEvalCase
+      description: Explicit owner revision only; frozen holdouts reject edits. Body
+        {expectedRevision,input:EvalCaseInput,freeze?:boolean}.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - expectedRevision
+                - input
+              properties:
+                expectedRevision:
+                  type: integer
+                input:
+                  $ref: '#/components/schemas/EvalCaseInput'
+                freeze:
+                  type: boolean
+      responses:
+        '200':
+          description: EvalCase
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EvalCase'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/evaluation/import:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    post:
+      operationId: importEvalCases
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cases:
+                  type: array
+                  maxItems: 500
+                  items:
+                    $ref: '#/components/schemas/EvalCaseInput'
+                csv:
+                  type: string
+                  maxLength: 1000000
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/evaluation/runs:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: listEvalRuns
+      description: Page<EvalRun>
+      responses:
+        '200':
+          description: EvalRun[]
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - items
+                      - nextCursor
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/EvalRun'
+                      nextCursor:
+                        type:
+                          - string
+                          - 'null'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+    post:
+      operationId: runEvaluation
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - releaseId
+              properties:
+                releaseId:
+                  type: string
+                  format: uuid
+                caseIds:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/evaluation/runs/{runId}:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getEvalRun
+      description: EvalRunDetail; expected facts are immutable run snapshots.
+      responses:
+        '200':
+          description: EvalRunDetail
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EvalRunDetail'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/evaluation/results/{resultId}/verdict:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - name: resultId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: reviewEvalResult
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - verdict
+              properties:
+                verdict:
+                  enum:
+                    - candidate_better
+                    - baseline_better
+                    - tie
+                    - ungradable
+      responses:
+        '200':
+          description: EvalResult
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EvalResult'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/releases:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: listReleases
+      description: Page<Release>
+      responses:
+        '200':
+          description: Release[]
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - items
+                      - nextCursor
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Release'
+                      nextCursor:
+                        type:
+                          - string
+                          - 'null'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+    post:
+      operationId: snapshotDraft
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - label
+              properties:
+                label:
+                  type: string
+                  maxLength: 120
+      responses:
+        '201':
+          description: Release
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Release'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/releases/{releaseId}:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/releaseId'
+    get:
+      operationId: getRelease
+      description: Release
+      responses:
+        '200':
+          description: Release
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Release'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/releases/{releaseId}/checks:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/releaseId'
+    get:
+      operationId: releaseChecks
+      description: ReleaseChecks
+      responses:
+        '200':
+          description: ReleaseChecks
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ReleaseChecks'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/releases/{releaseId}/publish:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/releaseId'
+    post:
+      operationId: publish
+      description: Atomic compare-and-swap; returns Agent. Check warnings require explicit acknowledgement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Publish'
+      responses:
+        '200':
+          description: Agent
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Agent'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/releases/{releaseId}/rollback:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/releaseId'
+    post:
+      operationId: rollback
+      description: Same atomic pointer switch; requires previously published release and never clears revocations.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Publish'
+      responses:
+        '200':
+          description: Agent
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Agent'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/settings:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: getSettings
+      description: Settings
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Settings'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  $ref: '#/components/schemas/Config'
+                retentionDays:
+                  type: integer
+                  minimum: 1
+                  maximum: 30
+                monthlySpendLimitMicros:
+                  type: integer
+                  minimum: 0
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Settings'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/members:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: listMembers
+      description: Member array
+      responses:
+        '200':
+          description: Member[]raw
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Member'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: inviteMember
+      description: Returns pending invitation. It is claimed by a verified matching Supabase email on bootstrap.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  const: member
+      responses:
+        '201':
+          $ref: '#/components/responses/OK'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/members/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      operationId: removeMember
+      description: Owner cannot remove the owner. Returns {deleted:true}.
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/usage:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: usage
+      description: Usage; limits are configured planning assumptions.
+      responses:
+        '200':
+          description: Usage
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Usage'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/billing/checkout:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    post:
+      operationId: checkout
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - plan
+              properties:
+                plan:
+                  enum:
+                    - starter
+                    - growth
+      responses:
+        '200':
+          description: BillingLink
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingLink'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/billing/portal:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    post:
+      operationId: billingPortal
+      description: BillingLink
+      responses:
+        '200':
+          description: BillingLink
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/BillingLink'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/jobs/{jobId}:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+      - $ref: '#/components/parameters/jobId'
+    get:
+      operationId: getJob
+      description:
+        Job<T>; answer jobs return Answer, ingestion SourceDetail, imports {imported}, evaluations {runId}, email
+        Escalation.
+      responses:
+        '200':
+          description: ApiJob
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApiJob'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /workspaces/{workspaceId}/notifications:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: notifications
+      description: Page<Notification>; daily maintenance batches appear here.
+      responses:
+        '200':
+          description: Notification[]
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - items
+                      - nextCursor
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Notification'
+                      nextCursor:
+                        type:
+                          - string
+                          - 'null'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+  /workspaces/{workspaceId}/installations:
+    parameters:
+      - $ref: '#/components/parameters/workspaceId'
+    get:
+      operationId: installations
+      description: Observed widget installation sessions; observation is not visitor authentication.
+      responses:
+        '200':
+          description: Installation[]raw
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Installation'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+      parameters:
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/cursor'
+  /public/sessions:
+    post:
+      operationId: widgetSession
+      security: []
+      parameters:
+        - name: Origin
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uri
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WidgetSessionRequest'
+      responses:
+        '201':
+          description: WidgetSession
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WidgetSession'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /public/conversation:
+    get:
+      operationId: widgetConversation
+      security:
+        - widget: []
+      description: ConversationDetail bound to session; no workspace/conversation selector accepted.
+      responses:
+        '200':
+          description: ConversationDetail
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ConversationDetail'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /public/messages:
+    post:
+      operationId: widgetMessage
+      security:
+        - widget: []
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - question
+              properties:
+                question:
+                  type: string
+                  maxLength: 4000
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /public/feedback:
+    post:
+      operationId: widgetFeedback
+      security:
+        - widget: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Feedback'
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        default:
+          $ref: '#/components/responses/Error'
+  /public/handoff:
+    post:
+      operationId: widgetHandoff
+      security:
+        - widget: []
+      parameters:
+        - $ref: '#/components/parameters/idempotency'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Handoff'
+      responses:
+        '202':
+          $ref: '#/components/responses/Accepted'
+        default:
+          $ref: '#/components/responses/Error'
+  /public/jobs/{jobId}:
+    parameters:
+      - $ref: '#/components/parameters/jobId'
+    get:
+      operationId: widgetJob
+      security:
+        - widget: []
+      description: Job bound to visitor session.
+      responses:
+        '200':
+          description: ApiJob
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - requestId
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ApiJob'
+                  requestId:
+                    type: string
+        default:
+          $ref: '#/components/responses/Error'
+  /public/sources/{sourceId}/asset:
+    parameters:
+      - $ref: '#/components/parameters/sourceId'
+    get:
+      operationId: widgetAsset
+      security:
+        - widget: []
+      description: Original only if cited to this session and still eligible.
+      responses:
+        '200':
+          description: Private attachment
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+  /webhooks/stripe:
+    post:
+      operationId: stripeWebhook
+      security: []
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        default:
+          $ref: '#/components/responses/Error'
