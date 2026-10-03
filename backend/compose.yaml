@@ -1,0 +1,51 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: lattice
+      POSTGRES_USER: lattice_admin
+      POSTGRES_PASSWORD: lattice_migration_local_only
+    ports: ['127.0.0.1:54329:5432']
+    volumes:
+      [
+        'lattice_db:/var/lib/postgresql/data',
+        './deploy/local-roles.sql:/docker-entrypoint-initdb.d/00-roles.sql:ro',
+      ]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lattice_admin -d lattice']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  migrate:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://lattice:lattice_local_only@db:5432/lattice
+      MIGRATION_DATABASE_URL: postgres://lattice_admin:lattice_migration_local_only@db:5432/lattice
+    command: ['node', 'dist/backend/src/migrate.js']
+    depends_on:
+      db: { condition: service_healthy }
+    restart: 'no'
+  api:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://lattice:lattice_local_only@db:5432/lattice
+    ports: ['4000:4000']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+  worker:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://lattice:lattice_local_only@db:5432/lattice
+    command: ['node', 'dist/backend/src/worker.js']
+    healthcheck: { disable: true }
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    mem_limit: 5g
+    cpus: 2
+    restart: unless-stopped
+volumes:
+  lattice_db:
