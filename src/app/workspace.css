@@ -1,0 +1,950 @@
+/* Workspace-only corrections to the shared foundation in globals.css. */
+.workspace .workspace-body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.workspace .app-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.workspace .sidebar {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  scrollbar-width: thin;
+  scrollbar-color: var(--green) var(--green-dark);
+}
+
+.workspace .sidebar > * {
+  flex-shrink: 0;
+}
+
+.workspace .workspace-switcher strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace .breadcrumb {
+  min-width: 0;
+}
+
+.workspace .breadcrumb > span:first-of-type {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace .breadcrumb > strong,
+.workspace .topbar-right,
+.workspace .button-counter {
+  flex-shrink: 0;
+}
+
+.workspace .button-counter {
+  display: inline-grid;
+  min-width: 18px;
+  min-height: 18px;
+  padding-inline: 4px;
+  place-items: center;
+  color: var(--green-dark);
+  background: var(--green-soft);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 9px;
+}
+
+.workspace .page-heading > div:first-child,
+.workspace .panel-heading > div,
+.workspace .metric,
+.workspace .health-summary > div {
+  min-width: 0;
+}
+
+.workspace .panel-heading > .subtle-link {
+  flex-shrink: 0;
+}
+
+.workspace .metric > span,
+.workspace .metric > strong {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.workspace .metric-spark {
+  height: 44px;
+  margin-top: 0.6rem;
+}
+
+/* Keep all 28 bars inside the plot at phone widths. */
+.workspace .chart-bars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: clamp(2px, 0.4vw, 6px);
+  justify-items: center;
+}
+
+.workspace .chart-bars > button {
+  min-width: 0;
+}
+
+.workspace .chart-bars > button:nth-child(-n + 3) .chart-tooltip {
+  left: 0;
+  transform: none;
+}
+
+.workspace .chart-bars > button:nth-last-child(-n + 3) .chart-tooltip {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+.workspace .chart-legend,
+.workspace .health-key,
+.workspace .overview-note {
+  flex-wrap: wrap;
+}
+
+.workspace .badge {
+  font-size: 9px;
+}
+
+:where(.workspace, .standalone-preview) :is(.badge-dot, .summary-icon, .status-ring, .draft-indicator, .health-mark, .person-avatar, .attention-icon, .agent-mark, .message-mark) {
+  flex-shrink: 0;
+}
+
+/* The source name is a button; its icon is not a text column. */
+.workspace .source-table-wrap {
+  position: relative;
+}
+
+.workspace .source-name {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.workspace .source-name > .source-type-icon {
+  display: grid;
+  flex: 0 0 30px;
+  place-items: center;
+}
+
+.workspace .source-name > span:last-child {
+  min-width: 0;
+  max-width: clamp(220px, 25vw, 380px);
+}
+
+.workspace .source-name :is(strong, small) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace .source-name:hover strong {
+  color: var(--green);
+}
+
+.workspace .source-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--green);
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.workspace .source-table tbody tr:has(input:checked) {
+  background: var(--surface-warm);
+}
+
+.workspace .reference-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  background: var(--amber);
+  border-radius: 50%;
+}
+
+.workspace .table-footnote {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.workspace .table-footnote > span:last-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.workspace .knowledge-tip {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: var(--surface-warm);
+  border: 1px solid var(--line);
+}
+
+.workspace .knowledge-tip h3 {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.workspace .knowledge-tip p {
+  max-width: 640px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.workspace .tip-diagram {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.5rem;
+  font-size: 10px;
+}
+
+.workspace .tip-diagram > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.workspace .tip-answer {
+  flex: 0 1 auto;
+  padding: 0.65rem 0.8rem;
+  color: var(--green-dark);
+  background: var(--green-soft);
+}
+
+:where(.workspace, .standalone-preview) .empty {
+  display: flex;
+  min-height: 280px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+}
+
+:where(.workspace, .standalone-preview) .empty-symbol {
+  display: grid;
+  width: 60px;
+  height: 60px;
+  margin-bottom: 0.5rem;
+  place-items: center;
+  color: var(--green);
+  background: var(--green-soft);
+  border-radius: 50%;
+}
+
+:where(.workspace, .standalone-preview) .empty-symbol > svg {
+  grid-area: 1 / 1;
+}
+
+:where(.workspace, .standalone-preview) .empty h3 {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+:where(.workspace, .standalone-preview) .empty p {
+  max-width: 340px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+:where(.workspace, .standalone-preview) .empty > .button {
+  margin-top: 0.5rem;
+}
+
+/* Match the actual chat input and mixed icon/text actions. */
+:where(.workspace, .standalone-preview) .chat-panel {
+  height: 700px;
+  min-height: 0;
+}
+
+:where(.workspace, .standalone-preview) .chat-panel-header,
+:where(.workspace, .standalone-preview) .chat-composer,
+:where(.workspace, .standalone-preview) .chat-disclaimer {
+  flex-shrink: 0;
+}
+
+:where(.workspace, .standalone-preview) .chat-panel-header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.workspace, .standalone-preview) .chat-messages {
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+:where(.workspace, .standalone-preview) .chat-welcome {
+  min-height: min-content;
+}
+
+:where(.workspace, .standalone-preview) .chat-composer {
+  align-items: center;
+}
+
+:where(.workspace, .standalone-preview) .chat-composer input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.7rem 0.8rem;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: 13px;
+}
+
+:where(.workspace, .standalone-preview) .chat-composer button {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+:where(.workspace, .standalone-preview) .message-body {
+  overflow-wrap: anywhere;
+}
+
+:where(.workspace, .standalone-preview) .citation-link {
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+:where(.workspace, .standalone-preview) .citation-link > span {
+  flex-shrink: 0;
+}
+
+:where(.workspace, .standalone-preview) .message-tools {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+:where(.workspace, .standalone-preview) .message-tools button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+}
+
+:where(.workspace, .standalone-preview) .message-tools button:last-child {
+  display: inline-flex;
+  width: auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+:where(.workspace, .standalone-preview) .message-tools button.selected {
+  color: var(--green-dark);
+  background: var(--green-soft);
+  border-color: var(--line-strong);
+}
+
+:where(.workspace, .standalone-preview) .thinking::before {
+  content: none;
+}
+
+:where(.workspace, .standalone-preview) .thinking > span {
+  width: 4px;
+  height: 4px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: pulse 800ms ease-in-out infinite alternate;
+}
+
+:where(.workspace, .standalone-preview) .thinking > span:nth-of-type(2) {
+  animation-delay: 150ms;
+}
+
+:where(.workspace, .standalone-preview) .thinking > span:nth-of-type(3) {
+  animation-delay: 300ms;
+}
+
+:where(.workspace, .standalone-preview) .thinking small {
+  font-size: 11px;
+}
+
+:where(.workspace, .standalone-preview) .chat-disclaimer {
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+:where(.workspace, .standalone-preview) .evidence-panel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+:where(.workspace, .standalone-preview) .evidence-panel > h2 {
+  margin-top: 1.5rem;
+  font-family: var(--serif);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+:where(.workspace, .standalone-preview) .evidence-panel > p {
+  margin-top: 0.65rem;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+:where(.workspace, .standalone-preview) .evidence-step > span {
+  flex-shrink: 0;
+}
+
+:where(.workspace, .standalone-preview) .evidence-step > div {
+  flex: 1;
+}
+
+:where(.workspace, .standalone-preview) .evidence-source-card {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--green);
+  border: 1px solid var(--line);
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+:where(.workspace, .standalone-preview) .evidence-source-card > span {
+  flex: 1;
+  min-width: 0;
+}
+
+:where(.workspace, .standalone-preview) .evidence-source-card:hover {
+  border-color: var(--green);
+}
+
+:where(.workspace, .standalone-preview) .evidence-bottom {
+  display: block;
+  margin-top: 1.3rem;
+  padding: 1.1rem;
+  color: var(--ink-soft);
+  background: var(--surface-warm);
+}
+
+:where(.workspace, .standalone-preview) .evidence-bottom > svg {
+  color: var(--green);
+}
+
+:where(.workspace, .standalone-preview) .evidence-bottom h3 {
+  margin-top: 0.65rem;
+  font-family: var(--serif);
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+:where(.workspace, .standalone-preview) .evidence-bottom p {
+  margin-top: 0.55rem;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.75;
+}
+
+:where(.workspace, .standalone-preview) .evidence-bottom a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  color: var(--green);
+  font-size: 11px;
+}
+
+/* Shared app dialogs remain in the browser top layer. */
+:where(.workspace, .standalone-preview) .modal {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+:where(.workspace, .standalone-preview) :is(.modal-heading, .drawer-top) {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  gap: 1rem;
+  background: var(--surface);
+}
+
+:where(.workspace, .standalone-preview) .modal-heading > div {
+  min-width: 0;
+}
+
+:where(.workspace, .standalone-preview) .modal-heading h2 {
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+:where(.workspace, .standalone-preview) .modal-heading .icon-button,
+:where(.workspace, .standalone-preview) .drawer-top .icon-button {
+  flex-shrink: 0;
+}
+
+:where(.workspace, .standalone-preview) .command-search input {
+  min-width: 0;
+}
+
+:where(.workspace, .standalone-preview) .command-results button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+:where(.workspace, .standalone-preview) .command-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+:where(.workspace, .standalone-preview) .import-tabs {
+  overflow-x: auto;
+}
+
+:where(.workspace, .standalone-preview) .import-tabs button {
+  min-height: 44px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+:where(.workspace, .standalone-preview) .file-drop {
+  padding: 1rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+:where(.workspace, .standalone-preview) .field {
+  min-width: 0;
+  font-size: 11px;
+}
+
+:where(.workspace, .standalone-preview) :is(.field input, .field textarea) {
+  min-width: 0;
+  border-radius: 2px;
+  font-size: 13px;
+}
+
+:where(.workspace, .standalone-preview) :is(.field input, .field textarea, .chat-composer input):focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+:where(.workspace, .standalone-preview) :is(.search-field, .command-search):focus-within {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 15%, transparent);
+}
+
+:where(.workspace, .standalone-preview) .form-footer {
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+:where(.workspace, .standalone-preview) .form-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+:where(.workspace, .standalone-preview) .form-footer > .button {
+  flex-shrink: 0;
+}
+
+:where(.workspace, .standalone-preview) .source-drawer {
+  height: 100dvh;
+  max-height: 100dvh;
+  overscroll-behavior: contain;
+}
+
+:where(.workspace, .standalone-preview) .drawer-title h2 {
+  overflow-wrap: anywhere;
+}
+
+:where(.workspace, .standalone-preview) .drawer-badges {
+  flex-wrap: wrap;
+}
+
+:where(.workspace, .standalone-preview) .source-settings > div {
+  min-width: 0;
+}
+
+:where(.workspace, .standalone-preview) .source-settings select {
+  max-width: 100%;
+  align-self: flex-start;
+  min-height: 38px;
+  font-size: 11px;
+}
+
+:where(.workspace, .standalone-preview) .source-content-header {
+  gap: 1rem;
+}
+
+:where(.workspace, .standalone-preview) .source-content-header .subtle-link {
+  flex-shrink: 0;
+  background: transparent;
+}
+
+:where(.workspace, .standalone-preview) .editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+:where(.workspace, .standalone-preview) .extracted-content {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 0.6rem;
+  font-size: 12px;
+  white-space: normal;
+}
+
+:where(.workspace, .standalone-preview) .content-line-number {
+  width: auto;
+  padding-top: 0.3rem;
+}
+
+:where(.workspace, .standalone-preview) .extracted-content p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+:where(.workspace, .standalone-preview) .source-provenance {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+:where(.workspace, .standalone-preview) .drawer-bottom {
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+}
+
+:where(.workspace, .standalone-preview) button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* The provider renders notifications beside, rather than inside, the shell. */
+.toast {
+  align-items: flex-start;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.toast .toast-mark {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.toast > button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  margin-top: -0.2rem;
+  padding: 0;
+  place-items: center;
+}
+
+@media (min-width: 851px) and (max-width: 1180px) {
+  .workspace .overview-middle,
+  .workspace .overview-bottom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace .overview-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace .knowledge-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 850px) {
+  .workspace .sidebar {
+    max-width: calc(100% - 40px);
+  }
+
+  .workspace .app-topbar {
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .workspace .app-topbar {
+    padding-inline: 1rem;
+  }
+
+  .workspace .breadcrumb {
+    flex: 1;
+    gap: 0.4rem;
+    font-size: 11px;
+  }
+
+  .workspace .breadcrumb .mobile-menu {
+    flex-shrink: 0;
+    margin-left: -0.35rem;
+  }
+
+  .workspace .topbar-right {
+    gap: 0;
+  }
+
+  .workspace .topbar-right .button {
+    min-height: 38px;
+    gap: 0.35rem;
+    padding-inline: 0.6rem;
+    font-size: 11px;
+  }
+
+  .workspace .page-heading {
+    gap: 1.4rem;
+    margin-bottom: 1.7rem;
+  }
+
+  .workspace .page-actions > .button {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+
+  .workspace .panel,
+  .workspace .attention-panel,
+  .workspace .knowledge-tip {
+    padding: 1rem;
+  }
+
+  .workspace .activity-panel .panel-heading {
+    flex-wrap: wrap;
+  }
+
+  .workspace .recent-conversation {
+    grid-template-columns: 30px minmax(0, 1fr) 16px;
+    gap: 0.4rem 0.6rem;
+  }
+
+  .workspace .recent-conversation > .row-arrow {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .workspace .recent-conversation > .badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .workspace .recent-conversation > .conversation-time {
+    grid-column: 2;
+  }
+
+  .workspace .chart-legend {
+    gap: 0.5rem 0.8rem;
+  }
+
+  .workspace .chart-demo {
+    margin-left: 0;
+  }
+
+  .workspace .overview-note {
+    align-items: flex-start;
+  }
+
+  .workspace .overview-note > span:not(.mono) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .workspace .overview-note .mono {
+    flex-basis: 100%;
+    margin-left: 1.4rem;
+  }
+
+  .workspace .source-table-wrap {
+    overscroll-behavior-x: contain;
+  }
+
+  .workspace .tip-diagram {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
+  }
+
+  .workspace .tip-diagram > span {
+    justify-content: center;
+  }
+
+  .workspace .tip-diagram > span:nth-child(2),
+  .workspace .tip-diagram > span:nth-child(4) {
+    align-self: center;
+    transform: rotate(90deg);
+  }
+
+  :where(.workspace, .standalone-preview) .chat-panel {
+    height: min(700px, calc(100svh - 5.5rem));
+    min-height: 560px;
+  }
+
+  :where(.workspace, .standalone-preview) .chat-panel-header {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 0.65rem;
+    padding: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) .chat-panel-header select {
+    grid-column: 2;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 40px;
+    margin-left: 0;
+  }
+
+  :where(.workspace, .standalone-preview) .chat-welcome-mark {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) .chat-welcome h2 {
+    font-size: 35px;
+  }
+
+  :where(.workspace, .standalone-preview) .suggested-questions {
+    margin-top: 1.2rem;
+  }
+
+  :where(.workspace, .standalone-preview) .suggested-questions button {
+    min-height: 44px;
+    font-size: 11px;
+  }
+
+  :where(.workspace, .standalone-preview) .chat-composer {
+    padding: 0.8rem;
+  }
+
+  :where(.workspace, .standalone-preview) .chat-disclaimer {
+    margin-inline: 0.8rem;
+  }
+
+  :where(.workspace, .standalone-preview) .evidence-panel {
+    padding: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) :is(.modal-heading, .help-body, .import-form, .drawer-top, .drawer-title, .source-settings, .source-editor) {
+    padding: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) .import-tabs {
+    padding-inline: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) .command-search {
+    margin-inline: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) .command-results,
+  :where(.workspace, .standalone-preview) .command-footer {
+    padding-inline: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) .form-footer {
+    flex-wrap: wrap;
+    gap: 0.8rem;
+  }
+
+  :where(.workspace, .standalone-preview) .form-footer > .button {
+    width: 100%;
+  }
+
+  :where(.workspace, .standalone-preview) .source-settings {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  :where(.workspace, .standalone-preview) .source-settings select {
+    width: 100%;
+  }
+
+  :where(.workspace, .standalone-preview) .source-content-header {
+    flex-wrap: wrap;
+    padding-inline: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) .extracted-content,
+  :where(.workspace, .standalone-preview) .source-provenance {
+    margin-inline: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) .drawer-bottom {
+    padding: 1rem;
+  }
+
+  :where(.workspace, .standalone-preview) .editor-actions > .button,
+  :where(.workspace, .standalone-preview) .drawer-bottom > .button {
+    flex: 1 1 130px;
+  }
+
+  :where(.workspace, .standalone-preview) :is(.field input, .field textarea, .search-field input, .command-search input, .chat-composer input, .chat-panel-header select, .source-settings select, .small-select) {
+    font-size: 16px;
+  }
+
+  .toast {
+    right: 1rem;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    max-width: calc(100% - 2rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.workspace, .standalone-preview) .page-enter,
+  :where(.workspace, .standalone-preview) .thinking > span {
+    animation: none;
+  }
+
+  :where(.workspace, .standalone-preview) .sidebar,
+  :where(.workspace, .standalone-preview) .button {
+    transition: none;
+  }
+
+  :where(.workspace, .standalone-preview) .button:hover {
+    transform: none;
+  }
+}
